@@ -8,6 +8,5 @@ Esta aplicacion planea registrar gastos de usuarios, permitiendo categorizar dis
 
 ### Ejecucion de tests de forma automatica
 
-1. Copiar el archivo '.env.sample' y crear un archivo '.env'. Para hacerlo ejecutar el comando `cp .env.sample .env`. Puede cambiar su contenido si asi lo desea.
-2. Para levantar los contenedores de testing y base de datos, correr los tests y luego dar de baja estos contenedores, simplemente debera ejecutar el siguiente comando ejecutando el Makefile presente en el directorio:<br>
+Para crear archivo ".env" a partir de ".env.sample" si aun no existe, levantar los contenedores de testing y base de datos, correr los tests y luego dar de baja estos contenedores, simplemente debera ejecutar el siguiente comando ejecutando el Makefile presente en el directorio:<br>
 ` make test ` <br>

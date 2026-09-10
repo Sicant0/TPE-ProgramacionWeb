@@ -10,6 +10,7 @@ services:
     ports:
       - ${PORT_OUT}:${PORT_IN}
     volumes:
+      - pgdata:/var/lib/postgresql/data
       - ./db/schema:/docker-entrypoint-initdb.d
     networks:
       - red-app
@@ -32,6 +33,9 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
+
+volumes:
+  pgdata:
 
 networks:
   red-app:

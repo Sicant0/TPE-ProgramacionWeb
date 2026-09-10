@@ -1,11 +1,13 @@
 # TPE-ProgramacionWeb
 
-## Instrucciones de ejecucion
+## Informacion sobre persistencia
 
-Go puede ser compilado o ejecutado directamente, la opcion mas sencilla es ejecutarlo directamente utilizando el comando "go run [nombre_archivo]".
+Esta aplicacion planea registrar gastos de usuarios, permitiendo categorizar distintos gastos y mantener registro de ellos. Para ello, existen los modelos de Usuario (IDUser, Username, Email) y Gasto (IDGasto, IDUser, Titulo, Descripcion, Monto, Categoria, Fecha).
 
-En este caso particular, se puede ejecutar utilizando el comando "go run main.go" sobre el directorio del repositorio.<br>
+## Informacion sobre ejecucion
 
-Una vez ejecutado, el servidor estara disponible en: "http://localhost:8080/"<br>
+### Ejecucion de tests de forma automatica
 
-Para detener el servidor, presionar "Ctrl+C" en la terminal.
+1. Copiar el archivo '.env.sample' y crear un archivo '.env'. Para hacerlo ejecutar el comando `cp .env.sample .env`. Puede cambiar su contenido si asi lo desea.
+2. Para levantar los contenedores de testing y base de datos, correr los tests y luego dar de baja estos contenedores, simplemente debera ejecutar el siguiente comando ejecutando el Makefile presente en el directorio:<br>
+` make test ` <br>

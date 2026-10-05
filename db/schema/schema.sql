@@ -20,7 +20,7 @@ CREATE TABLE Gasto (
     id_gasto serial  NOT NULL,
     id_user int  NOT NULL,
     titulo varchar(15)  NOT NULL,
-    descripcion text  NOT NULL,
+    descripcion varchar(255)  NOT NULL,
     monto decimal(12,2)  NOT NULL,
     categoria posibles_categorias  NOT NULL,
     fecha date  NOT NULL,

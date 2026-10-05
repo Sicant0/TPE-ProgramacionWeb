@@ -1,26 +1,50 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
+	db "proyectoweb/db/sqlc"
+
+	_ "github.com/lib/pq"
+)
+
+var (
+	dbConn  *sql.DB
+	queries *db.Queries
 )
 
 func main() {
-	//define ruta hacia directorio static
-	staticDir := "./static"
+	http.HandleFunc("/usuario", UsuarioHandler)
+	http.HandleFunc("/usuario/", UsuarioHandler)
+	http.HandleFunc("/gasto", GastoHandler)
+	http.HandleFunc("/gasto/", GastoHandler)
 
-	//crea fileServer apuntando hacia el directorio
-	fileServer := http.FileServer(http.Dir(staticDir))
-
-	//crea handle para root hacia fileServer
-	http.Handle("/", fileServer)
-	port := ":8080"
-	fmt.Printf("Servidor estatico escuchando en http://localhost%s\n", port)
-	fmt.Printf("Sirviendo archivos desde: %s\n", staticDir)
-
-	//inicia servidor exponiendo port (:8080)
-	err := http.ListenAndServe(port, nil)
+	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		os.Getenv("DB_HOST"), os.Getenv("PORT_IN"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_NAME"))
+	var err error
+	dbConn, err = sql.Open("postgres", connStr)
 	if err != nil {
-		fmt.Printf("Error al iniciar el servidor: %s\n", err)
+		log.Fatalf("Error connecting to database: %v", err)
+	}
+	defer dbConn.Close()
+
+	//esto solo esta para cuando se corre por docker compose
+	err = dbConn.Ping()
+	if err != nil {
+		log.Fatalf("Error conectando a la base de datos (Ping fallido): %v", err)
+	}
+	log.Println("¡Conexión exitosa a la base de datos!")
+
+	// Instancio el repositorio
+	queries = db.New(dbConn)
+
+	port := ":8080"
+	fmt.Printf("Servidor escuchando en el puerto %s\n", port)
+	err = http.ListenAndServe(port, nil)
+	if err != nil {
+		fmt.Println("Error al iniciar el servidor:", err)
 	}
 }

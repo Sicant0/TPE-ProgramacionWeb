@@ -1,0 +1,17 @@
+FROM golang:1.25
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+# Compilar la aplicacion en un binario llamado "backend"
+RUN go build -o backend .
+
+# Exponer puerto 8080
+EXPOSE 8080
+
+# Ejecutar el binario para levantar backend
+CMD ["./backend"]

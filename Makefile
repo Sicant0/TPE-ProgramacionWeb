@@ -7,10 +7,10 @@ make-env:
 
 generate:
 	sqlc generate
-	
-test: make-env generate
-	docker compose up -d db
-	docker compose run --rm test; \
+
+hurl-test: make-env generate
+	docker compose up -d --build db api
+	docker compose run --rm hurl ; \
 	status=$$?; \
-	docker compose down; \
-	exit $$status
+    docker compose down -v; \
+    exit $$status

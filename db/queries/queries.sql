@@ -16,12 +16,13 @@ VALUES (
 RETURNING *;
 
 
--- name: UpdateUsuario :exec
+-- name: UpdateUsuario :one
 UPDATE Usuario
 SET
     username = $2,
     email = $3
-WHERE id_user = $1;
+WHERE id_user = $1
+RETURNING *;
 
 
 -- name: DeleteUsuario :exec
@@ -38,9 +39,10 @@ WHERE id_gasto = $1;
 -- name: GetGastosByUsuario :many
 SELECT *
 FROM Gasto
-WHERE id_user = $1
-ORDER BY fecha DESC;
+WHERE id_user = $1;
 
+-- name: GetAllUsuarios :many
+SELECT * FROM Usuario;
 
 -- name: CreateGasto :one
 INSERT INTO Gasto (
@@ -62,7 +64,7 @@ VALUES (
 RETURNING *;
 
 
--- name: UpdateGasto :exec
+-- name: UpdateGasto :one
 UPDATE Gasto
 SET
     titulo = $3,
@@ -71,10 +73,13 @@ SET
     categoria = $6,
     fecha = $7
 WHERE id_gasto = $1
-  AND id_user = $2;
+  AND id_user = $2
+RETURNING *;
 
 
 -- name: DeleteGasto :exec
 DELETE FROM Gasto
-WHERE id_gasto = $1
-  AND id_user = $2;
+WHERE id_gasto = $1;
+
+-- name: GetAllGastos :many
+SELECT * FROM Gasto;

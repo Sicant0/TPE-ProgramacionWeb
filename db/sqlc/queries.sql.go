@@ -88,16 +88,10 @@ func (q *Queries) CreateUsuario(ctx context.Context, arg CreateUsuarioParams) (U
 const deleteGasto = `-- name: DeleteGasto :exec
 DELETE FROM Gasto
 WHERE id_gasto = $1
-  AND id_user = $2
 `
 
-type DeleteGastoParams struct {
-	IDGasto int32 `json:"id_gasto"`
-	IDUser  int32 `json:"id_user"`
-}
-
-func (q *Queries) DeleteGasto(ctx context.Context, arg DeleteGastoParams) error {
-	_, err := q.db.ExecContext(ctx, deleteGasto, arg.IDGasto, arg.IDUser)
+func (q *Queries) DeleteGasto(ctx context.Context, idGasto int32) error {
+	_, err := q.db.ExecContext(ctx, deleteGasto, idGasto)
 	return err
 }
 
@@ -109,6 +103,68 @@ WHERE id_user = $1
 func (q *Queries) DeleteUsuario(ctx context.Context, idUser int32) error {
 	_, err := q.db.ExecContext(ctx, deleteUsuario, idUser)
 	return err
+}
+
+const getAllGastos = `-- name: GetAllGastos :many
+SELECT id_gasto, id_user, titulo, descripcion, monto, categoria, fecha FROM Gasto
+`
+
+func (q *Queries) GetAllGastos(ctx context.Context) ([]Gasto, error) {
+	rows, err := q.db.QueryContext(ctx, getAllGastos)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Gasto
+	for rows.Next() {
+		var i Gasto
+		if err := rows.Scan(
+			&i.IDGasto,
+			&i.IDUser,
+			&i.Titulo,
+			&i.Descripcion,
+			&i.Monto,
+			&i.Categoria,
+			&i.Fecha,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllUsuarios = `-- name: GetAllUsuarios :many
+SELECT id_user, username, email FROM Usuario
+`
+
+func (q *Queries) GetAllUsuarios(ctx context.Context) ([]Usuario, error) {
+	rows, err := q.db.QueryContext(ctx, getAllUsuarios)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Usuario
+	for rows.Next() {
+		var i Usuario
+		if err := rows.Scan(&i.IDUser, &i.Username, &i.Email); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getGasto = `-- name: GetGasto :one
@@ -136,7 +192,6 @@ const getGastosByUsuario = `-- name: GetGastosByUsuario :many
 SELECT id_gasto, id_user, titulo, descripcion, monto, categoria, fecha
 FROM Gasto
 WHERE id_user = $1
-ORDER BY fecha DESC
 `
 
 func (q *Queries) GetGastosByUsuario(ctx context.Context, idUser int32) ([]Gasto, error) {
@@ -183,7 +238,7 @@ func (q *Queries) GetUsuario(ctx context.Context, idUser int32) (Usuario, error)
 	return i, err
 }
 
-const updateGasto = `-- name: UpdateGasto :exec
+const updateGasto = `-- name: UpdateGasto :one
 UPDATE Gasto
 SET
     titulo = $3,
@@ -193,6 +248,7 @@ SET
     fecha = $7
 WHERE id_gasto = $1
   AND id_user = $2
+RETURNING id_gasto, id_user, titulo, descripcion, monto, categoria, fecha
 `
 
 type UpdateGastoParams struct {
@@ -205,8 +261,8 @@ type UpdateGastoParams struct {
 	Fecha       time.Time          `json:"fecha"`
 }
 
-func (q *Queries) UpdateGasto(ctx context.Context, arg UpdateGastoParams) error {
-	_, err := q.db.ExecContext(ctx, updateGasto,
+func (q *Queries) UpdateGasto(ctx context.Context, arg UpdateGastoParams) (Gasto, error) {
+	row := q.db.QueryRowContext(ctx, updateGasto,
 		arg.IDGasto,
 		arg.IDUser,
 		arg.Titulo,
@@ -215,15 +271,26 @@ func (q *Queries) UpdateGasto(ctx context.Context, arg UpdateGastoParams) error 
 		arg.Categoria,
 		arg.Fecha,
 	)
-	return err
+	var i Gasto
+	err := row.Scan(
+		&i.IDGasto,
+		&i.IDUser,
+		&i.Titulo,
+		&i.Descripcion,
+		&i.Monto,
+		&i.Categoria,
+		&i.Fecha,
+	)
+	return i, err
 }
 
-const updateUsuario = `-- name: UpdateUsuario :exec
+const updateUsuario = `-- name: UpdateUsuario :one
 UPDATE Usuario
 SET
     username = $2,
     email = $3
 WHERE id_user = $1
+RETURNING id_user, username, email
 `
 
 type UpdateUsuarioParams struct {
@@ -232,7 +299,9 @@ type UpdateUsuarioParams struct {
 	Email    string `json:"email"`
 }
 
-func (q *Queries) UpdateUsuario(ctx context.Context, arg UpdateUsuarioParams) error {
-	_, err := q.db.ExecContext(ctx, updateUsuario, arg.IDUser, arg.Username, arg.Email)
-	return err
+func (q *Queries) UpdateUsuario(ctx context.Context, arg UpdateUsuarioParams) (Usuario, error) {
+	row := q.db.QueryRowContext(ctx, updateUsuario, arg.IDUser, arg.Username, arg.Email)
+	var i Usuario
+	err := row.Scan(&i.IDUser, &i.Username, &i.Email)
+	return i, err
 }

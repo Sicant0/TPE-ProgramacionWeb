@@ -12,4 +12,4 @@ Esta aplicacion planea registrar gastos de usuarios, permitiendo categorizar dis
  
 ### Ejecucion de tests de forma automatica
 
-Para crear archivo ".env" a partir de ".env.sample" si aun no existe, levantar los contenedores de testing y base de datos, correr los tests y luego dar de baja estos contenedores, simplemente debera ejecutar el siguiente comando ejecutando el Makefile presente en el directorio: ` make test `
+Para crear archivo ".env" a partir de ".env.sample" si aun no existe, levantar los contenedores de testing y base de datos, correr los tests y luego dar de baja estos contenedores, simplemente debera ejecutar el siguiente comando ejecutando el Makefile presente en el directorio: ` make hurl-test `

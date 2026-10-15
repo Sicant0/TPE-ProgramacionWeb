@@ -1,4 +1,4 @@
-.PHONY: make-env generate test
+.PHONY: make-env generate hurl-test
 
 make-env:
 	@if [ ! -f .env ]; then \

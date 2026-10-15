@@ -115,7 +115,7 @@ func (q *Queries) GetAllGastos(ctx context.Context) ([]Gasto, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Gasto
+	items := []Gasto{}
 	for rows.Next() {
 		var i Gasto
 		if err := rows.Scan(
@@ -150,7 +150,7 @@ func (q *Queries) GetAllUsuarios(ctx context.Context) ([]Usuario, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Usuario
+	items := []Usuario{}
 	for rows.Next() {
 		var i Usuario
 		if err := rows.Scan(&i.IDUser, &i.Username, &i.Email); err != nil {
@@ -200,7 +200,7 @@ func (q *Queries) GetGastosByUsuario(ctx context.Context, idUser int32) ([]Gasto
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Gasto
+	items := []Gasto{}
 	for rows.Next() {
 		var i Gasto
 		if err := rows.Scan(

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // tipos para handling de requests con anotaciones para "encoding/json"
@@ -55,12 +56,18 @@ func esEmailValido(email string) bool {
 	return strings.Contains(dominio, ".") && !strings.HasPrefix(dominio, ".") && !strings.HasSuffix(dominio, ".")
 }
 
-func esMontoValido(monto string) bool {
+func esMontoValido(monto string) error {
 	if monto == "" {
-		return false
+		return errors.New("el monto es requerido")
 	}
-	_, err := strconv.ParseFloat(monto, 64)
-	return err == nil
+	montoConvertido, err := strconv.ParseFloat(monto, 64)
+	if err != nil {
+		return errors.New("el monto debe ser numérico")
+	}
+	if montoConvertido <= 0 {
+		return errors.New("el monto debe ser mayor a cero")
+	}
+	return nil
 }
 
 func extraerID(path string) (int32, error) {
@@ -82,14 +89,15 @@ func (req GastoRequest) Validar() error {
 		return errors.New("id_user es requerido y debe ser mayor a 0")
 	}
 	titulo := strings.TrimSpace(req.Titulo)
-	if titulo == "" || len(titulo) > 15 {
+	if titulo == "" || utf8.RuneCountInString(titulo) > 15 {
 		return errors.New("titulo es requerido y debe tener hasta 15 caracteres")
 	}
-	if len(req.Descripcion) > 500 {
-		return errors.New("descripcion debe tener hasta 500 caracteres")
+	descripcion := strings.TrimSpace(req.Descripcion)
+	if descripcion == "" || utf8.RuneCountInString(descripcion) > 255 {
+		return errors.New("descripcion es requerida y debe tener hasta 255 caracteres")
 	}
-	if !esMontoValido(req.Monto) {
-		return errors.New("monto es requerido y debe ser numérico")
+	if err := esMontoValido(req.Monto); err != nil {
+		return err
 	}
 	if !categoriasValidas[req.Categoria] {
 		return errors.New("categoria inválida")
@@ -104,8 +112,11 @@ func (req UsuarioRequest) Validar() error {
 	req.Username = strings.TrimSpace(req.Username)
 	req.Email = strings.TrimSpace(req.Email)
 
-	if len(req.Username) < 3 || len(req.Username) > 25 {
+	if n := utf8.RuneCountInString(req.Username); n < 3 || n > 25 {
 		return errors.New("username debe tener entre 3 y 25 caracteres")
+	}
+	if utf8.RuneCountInString(req.Email) > 50 {
+		return errors.New("email debe tener hasta 50 caracteres")
 	}
 	if !esEmailValido(req.Email) {
 		return errors.New("email inválido")
@@ -193,19 +204,27 @@ func deleteUsuario(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
+	//check if user has any gastos
+	gastos, err := queries.GetGastosByUsuario(r.Context(), idUser)
+	if err != nil {
+		http.Error(w, "error al leer gastos del usuario", http.StatusInternalServerError)
+		return
+	}
+	if len(gastos) > 0 {
+		http.Error(w, "el usuario tiene gastos asociados", http.StatusConflict)
+		return
+	}
+	//delete usuario if all checks pass
 	if err := queries.DeleteUsuario(r.Context(), idUser); err != nil {
 		http.Error(w, "error al borrar usuario", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-
 }
 
 func getUsuario(w http.ResponseWriter, r *http.Request) {
-	idUser, err := extraerID(r.URL.Path)
-	if err != nil { //ACA SE TIENE QUE CAMBIAR PARA QUE SE DEVUELVA TODOS LOS USUARIOS
+	if strings.Trim(r.URL.Path, "/") == "usuario" { //get all users
 		usuarios, err := queries.GetAllUsuarios(r.Context())
 		if err != nil {
 			http.Error(w, "error al leer usuarios", http.StatusInternalServerError)
@@ -214,7 +233,12 @@ func getUsuario(w http.ResponseWriter, r *http.Request) {
 		escribirJSON(w, http.StatusOK, usuarios)
 		return
 	}
-
+	//get single user
+	idUser, err := extraerID(r.URL.Path)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	usuario, err := queries.GetUsuario(r.Context(), idUser)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -226,7 +250,6 @@ func getUsuario(w http.ResponseWriter, r *http.Request) {
 	}
 
 	escribirJSON(w, http.StatusOK, usuario)
-
 }
 
 func updateUsuario(w http.ResponseWriter, r *http.Request) {
@@ -250,12 +273,15 @@ func updateUsuario(w http.ResponseWriter, r *http.Request) {
 
 	usuario, err := queries.UpdateUsuario(r.Context(), params)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "usuario no encontrado", http.StatusNotFound)
+			return
+		}
 		http.Error(w, "error al actualizar usuario", http.StatusInternalServerError)
 		return
 	}
 
 	escribirJSON(w, http.StatusOK, usuario)
-
 }
 
 func createGasto(w http.ResponseWriter, r *http.Request) {
@@ -264,7 +290,16 @@ func createGasto(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
+	//check user exists
+	if _, err := queries.GetUsuario(r.Context(), req.IDUser); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "el usuario indicado no existe", http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "error al leer el usuario", http.StatusInternalServerError)
+		return
+	}
+	//user exists, create db request
 	params := db.CreateGastoParams{
 		IDUser:      req.IDUser,
 		Titulo:      strings.TrimSpace(req.Titulo),
@@ -301,8 +336,7 @@ func deleteGasto(w http.ResponseWriter, r *http.Request) {
 }
 
 func getGasto(w http.ResponseWriter, r *http.Request) {
-	idGasto, err := extraerID(r.URL.Path)
-	if err != nil { //ACA SE TIENE QUE CAMBIAR PARA QUE SE DEVUELVA TODOS LOS GASTOS
+	if strings.Trim(r.URL.Path, "/") == "gasto" { //get all gastos
 		gastos, err := queries.GetAllGastos(r.Context())
 		if err != nil {
 			http.Error(w, "error al leer gastos", http.StatusInternalServerError)
@@ -311,11 +345,16 @@ func getGasto(w http.ResponseWriter, r *http.Request) {
 		escribirJSON(w, http.StatusOK, gastos)
 		return
 	}
-
+	//get single gasto
+	idGasto, err := extraerID(r.URL.Path)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	gasto, err := queries.GetGasto(r.Context(), idGasto)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			http.Error(w, "usuario no encontrado", http.StatusNotFound)
+			http.Error(w, "gasto no encontrado", http.StatusNotFound)
 			return
 		}
 		http.Error(w, "error interno", http.StatusInternalServerError)
@@ -350,10 +389,13 @@ func updateGasto(w http.ResponseWriter, r *http.Request) {
 
 	gasto, err := queries.UpdateGasto(r.Context(), params)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "gasto no encontrado", http.StatusNotFound)
+			return
+		}
 		http.Error(w, "error al actualizar gasto", http.StatusInternalServerError)
 		return
 	}
 
 	escribirJSON(w, http.StatusOK, gasto)
-
 }

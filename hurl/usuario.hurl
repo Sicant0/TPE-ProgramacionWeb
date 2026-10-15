@@ -64,4 +64,4 @@ HTTP 204
 GET {{base_url}}/usuario
 HTTP 200
 [Asserts]
-jsonpath "$" == null
+jsonpath "$" count == 0

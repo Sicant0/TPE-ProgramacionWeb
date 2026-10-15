@@ -106,7 +106,7 @@ HTTP 204
 GET {{base_url}}/gasto
 HTTP 200
 [Asserts]
-jsonpath "$" == null
+jsonpath "$" count == 0
 
 # Eliminar usuario
 DELETE {{base_url}}/usuario/{{id_usuario1}}
@@ -116,4 +116,4 @@ HTTP 204
 GET {{base_url}}/usuario
 HTTP 200
 [Asserts]
-jsonpath "$" == null
+jsonpath "$" count == 0

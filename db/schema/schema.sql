@@ -39,7 +39,8 @@ CREATE TABLE Usuario (
 -- Reference: Gasto_Usuario_FK (table: Gasto)
 ALTER TABLE Gasto ADD CONSTRAINT Gasto_Usuario_FK
     FOREIGN KEY (id_user)
-    REFERENCES Usuario (id_user)  
+    REFERENCES Usuario (id_user)
+    ON DELETE CASCADE
     NOT DEFERRABLE 
     INITIALLY IMMEDIATE
 ;

@@ -106,7 +106,7 @@ func (q *Queries) DeleteUsuario(ctx context.Context, idUser int32) error {
 }
 
 const getAllGastos = `-- name: GetAllGastos :many
-SELECT id_gasto, id_user, titulo, descripcion, monto, categoria, fecha FROM Gasto
+SELECT id_gasto, id_user, titulo, descripcion, monto, categoria, fecha FROM Gasto ORDER BY id_user, id_gasto
 `
 
 func (q *Queries) GetAllGastos(ctx context.Context) ([]Gasto, error) {
@@ -141,7 +141,7 @@ func (q *Queries) GetAllGastos(ctx context.Context) ([]Gasto, error) {
 }
 
 const getAllUsuarios = `-- name: GetAllUsuarios :many
-SELECT id_user, username, email FROM Usuario
+SELECT id_user, username, email FROM Usuario ORDER BY id_user
 `
 
 func (q *Queries) GetAllUsuarios(ctx context.Context) ([]Usuario, error) {

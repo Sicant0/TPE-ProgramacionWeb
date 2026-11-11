@@ -42,7 +42,7 @@ FROM Gasto
 WHERE id_user = $1;
 
 -- name: GetAllUsuarios :many
-SELECT * FROM Usuario;
+SELECT * FROM Usuario ORDER BY id_user;
 
 -- name: CreateGasto :one
 INSERT INTO Gasto (
@@ -82,4 +82,4 @@ DELETE FROM Gasto
 WHERE id_gasto = $1;
 
 -- name: GetAllGastos :many
-SELECT * FROM Gasto;
+SELECT * FROM Gasto ORDER BY id_user, id_gasto;

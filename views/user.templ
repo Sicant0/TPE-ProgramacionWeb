@@ -1,0 +1,94 @@
+package views
+
+import (
+	"fmt"
+	db "proyectoweb/db/sqlc"
+)
+
+// UserList lista todos los usuarios y sus datos, y permite editar y eliminar cada uno
+templ UserList(usuarios []db.Usuario) {
+	if len(usuarios) == 0 {
+		<p class="empty">Todavía no hay usuarios cargados.</p>
+	} else {
+		<ul class="list" id="user-list">
+			for _, u := range usuarios {
+				<li class="list-item">
+					<div class="item-main">
+						<span class="item-title">{ u.Username }</span>
+						<span class="item-sub">{ u.Email }</span>
+					</div>
+					<span class="tag">#{ fmt.Sprint(u.IDUser) }</span>
+					<div class="item-actions">
+						<a class="btn btn-secondary" href={ templ.URL(fmt.Sprintf("/usuarios/%d/editar", u.IDUser)) }>Editar</a>
+						<form method="post" action={ templ.URL(fmt.Sprintf("/usuarios/%d/eliminar", u.IDUser)) } onsubmit="return confirm('¿Borrar este usuario? También se borrarán todos sus gastos.')">
+							<button type="submit" class="btn btn-danger">Borrar</button>
+						</form>
+					</div>
+				</li>
+			}
+		</ul>
+	}
+}
+
+// Pagina de usuarios que utiliza la UserList.
+templ UsersPage(usuarios []db.Usuario) {
+	@Layout("Usuarios") {
+		<section class="panel">
+			<div class="panel-head">
+				<h1>Usuarios</h1>
+				<a class="btn" href="/usuarios/nuevo">Crear Usuario</a>
+			</div>
+			@UserList(usuarios)
+		</section>
+	}
+}
+
+// UserForm se utiliza tanto para crear un usuario como para editar un usuario
+templ UserForm(f UsuarioFormData) {
+	<form class="form" method="post" action={ userFormAction(f) }>
+		if f.Error != "" {
+			<p class="alert">{ f.Error }</p>
+		}
+		<label for="username">Username</label>
+		<input id="username" name="username" type="text" value={ f.Username } minlength="3" maxlength="25" required/>
+		<label for="email">Email</label>
+		<input id="email" name="email" type="email" value={ f.Email } maxlength="50" required/>
+		<div class="form-actions">
+			<a class="btn btn-secondary" href="/usuarios">Cancelar</a>
+			<button type="submit" class="btn">
+				if f.ID == 0 {
+					Crear usuario
+				} else {
+					Guardar cambios
+				}
+			</button>
+		</div>
+	</form>
+}
+
+// Pagina que utiliza UserForm
+templ UserFormPage(f UsuarioFormData) {
+	@Layout(userFormTitle(f)) {
+		<section class="panel panel-narrow">
+			<h1>{ userFormTitle(f) }</h1>
+			@UserForm(f)
+		</section>
+	}
+}
+
+// userFormAction devuelve la URL a la que el formulario hace POST:
+// /usuarios para crear (ID == 0) o /usuarios/{id}/editar para actualizar.
+func userFormAction(f UsuarioFormData) templ.SafeURL {
+	if f.ID == 0 {
+		return templ.URL("/usuarios")
+	}
+	return templ.URL(fmt.Sprintf("/usuarios/%d/editar", f.ID))
+}
+
+// Funcion auxiliar que se utiliza para formar el titulo del form entre Crear usuario y Editar usuario
+func userFormTitle(f UsuarioFormData) string {
+	if f.ID == 0 {
+		return "Crear usuario"
+	}
+	return "Editar usuario"
+}

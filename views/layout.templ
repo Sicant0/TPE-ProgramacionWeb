@@ -1,0 +1,31 @@
+package views
+
+// Layout principal de la pagina
+templ Layout(title string) {
+	<!DOCTYPE html>
+	<html lang="es">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ title } - Administrador de Gastos</title>
+			<link rel="stylesheet" href="/static/styles.css"/>
+		</head>
+		<body>
+			<header class="site-header">
+				<a class="brand" href="/">Administrador de Gastos</a>
+				<nav class="nav">
+					<a href="/usuarios/nuevo">Crear Usuario</a>
+					<a href="/gastos/nuevo">Crear Gasto</a>
+					<a href="/usuarios">Listar Usuarios</a>
+					<a href="/gastos">Listar Gastos</a>
+				</nav>
+			</header>
+			<main class="site-content">
+				{ children... }
+			</main>
+			<footer class="site-footer">
+				<p>TPE Programación Web</p>
+			</footer>
+		</body>
+	</html>
+}

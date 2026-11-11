@@ -1,0 +1,136 @@
+package views
+
+import (
+	"fmt"
+	db "proyectoweb/db/sqlc"
+)
+
+// GastoList lista todos los gastos, permite editar o eliminar gastos
+templ GastoList(gastos []db.Gasto) {
+	if len(gastos) == 0 {
+		<p class="empty">Todavía no hay gastos cargados.</p>
+	} else {
+		<ul class="list" id="gasto-list">
+			for _, g := range gastos {
+				<li class="list-item">
+					<div class="item-main">
+						<span class="item-title">{ g.Titulo }</span>
+						<span class="item-sub">{ g.Descripcion }</span>
+						<span class="item-meta">
+							{ g.Fecha.Format("02/01/2006") } · Usuario #{ fmt.Sprint(g.IDUser) }
+						</span>
+					</div>
+					<span class="tag">{ string(g.Categoria) }</span>
+					<span class="amount">$ { g.Monto }</span>
+					<div class="item-actions">
+						<a class="btn btn-secondary" href={ templ.URL(fmt.Sprintf("/gastos/%d/editar", g.IDGasto)) }>Editar</a>
+						<form method="post" action={ templ.URL(fmt.Sprintf("/gastos/%d/eliminar", g.IDGasto)) } onsubmit="return confirm('¿Borrar este gasto?')">
+							<button type="submit" class="btn btn-danger">Borrar</button>
+						</form>
+					</div>
+				</li>
+			}
+		</ul>
+	}
+}
+
+// Pagina de gastos que utiliza la GastoList.
+templ GastosPage(gastos []db.Gasto, errMsg string) {
+	@Layout("Gastos") {
+		<section class="panel">
+			<div class="panel-head">
+				<h1>Gastos</h1>
+				<a class="btn" href="/gastos/nuevo">Crear Gasto</a>
+			</div>
+			if errMsg != "" {
+				<p class="alert">{ errMsg }</p>
+			}
+			@GastoList(gastos)
+		</section>
+	}
+}
+
+// GastoForm se utiliza tanto para crear un gasto como para editar un gasto
+templ GastoForm(f GastoFormData, usuarios []db.Usuario) {
+	<form class="form" method="post" action={ gastoFormAction(f) }>
+		if f.Error != "" {
+			<p class="alert">{ f.Error }</p>
+		}
+		if f.ID == 0 {
+			<label for="id_user">Usuario</label>
+			<select id="id_user" name="id_user" required>
+				<option value="">Elegí un usuario</option>
+				for _, u := range usuarios {
+					<option value={ fmt.Sprint(u.IDUser) } selected?={ u.IDUser == f.IDUser }>{ u.Username }</option>
+				}
+			</select>
+		} else {
+			<label for="id_user">ID de usuario</label>
+			<input type="hidden" name="id_user" value={ fmt.Sprint(f.IDUser) }/>
+			<input id="id_user" type="text" value={ fmt.Sprint(f.IDUser) } disabled/>
+		}
+		<label for="titulo">Título</label>
+		<input id="titulo" name="titulo" type="text" value={ f.Titulo } maxlength="15" required/>
+		<label for="descripcion">Descripción</label>
+		<textarea id="descripcion" name="descripcion" maxlength="255" rows="3" required>{ f.Descripcion }</textarea>
+		<div class="form-row">
+			<div class="field">
+				<label for="monto">Monto</label>
+				<input id="monto" name="monto" type="number" step="0.01" min="0.01" value={ f.Monto } required/>
+			</div>
+			<div class="field">
+				<label for="fecha">Fecha</label>
+				<input id="fecha" name="fecha" type="date" value={ f.Fecha } required/>
+			</div>
+		</div>
+		<label for="categoria">Categoría</label>
+		<select id="categoria" name="categoria" required>
+			<option value="">Elegí una categoría</option>
+			for _, c := range Categorias {
+				<option value={ c } selected?={ c == f.Categoria }>{ c }</option>
+			}
+		</select>
+		<div class="form-actions">
+			<a class="btn btn-secondary" href="/gastos">Cancelar</a>
+			<button type="submit" class="btn">
+				if f.ID == 0 {
+					Crear gasto
+				} else {
+					Guardar cambios
+				}
+			</button>
+		</div>
+	</form>
+}
+
+// GastoFormPage es la pagina que utiliza GastoForm
+templ GastoFormPage(f GastoFormData, usuarios []db.Usuario) {
+	@Layout(gastoFormTitle(f)) {
+		<section class="panel panel-narrow">
+			<h1>{ gastoFormTitle(f) }</h1>
+			if f.ID == 0 && len(usuarios) == 0 {
+				<p class="empty">Para cargar un gasto primero tiene que existir un usuario.</p>
+				<a class="btn" href="/usuarios/nuevo">Crear Usuario</a>
+			} else {
+				@GastoForm(f, usuarios)
+			}
+		</section>
+	}
+}
+
+// gastoFormAction devuelve la URL a la que el formulario hace POST:
+// /gastos para crear (ID == 0) o /gastos/{id}/editar para actualizar.
+func gastoFormAction(f GastoFormData) templ.SafeURL {
+	if f.ID == 0 {
+		return templ.URL("/gastos")
+	}
+	return templ.URL(fmt.Sprintf("/gastos/%d/editar", f.ID))
+}
+
+// Funcion auxiliar que se utiliza para formar el titulo del form entre Crear Gasto o Editar Gasto
+func gastoFormTitle(f GastoFormData) string {
+	if f.ID == 0 {
+		return "Crear gasto"
+	}
+	return "Editar gasto"
+}

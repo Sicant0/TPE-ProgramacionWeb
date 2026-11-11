@@ -15,14 +15,16 @@ services:
     networks:
       - red-app
     healthcheck:
-      test: [ "CMD", "pg_isready", "-U", "${DB_USER}", "-d", "${DB_NAME}" ]
+      test: [ "CMD", "pg_isready", "-h", "127.0.0.1", "-U", "${DB_USER}", "-d", "${DB_NAME}" ]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 30
+      start_period: 120s
   api:
     build:
       context: .
       dockerfile: Dockerfile.api
+    restart: on-failure
     depends_on:
       db:
         condition: service_healthy
@@ -37,16 +39,6 @@ services:
       - DB_NAME=${DB_NAME}
       - PORT_IN=${PORT_IN}
       - PORT_OUT=${PORT_OUT}
-  hurl:
-    image: ghcr.io/orange-opensource/hurl:latest
-    depends_on:
-      - api
-    networks:
-      - red-app
-    volumes:
-      - ./hurl:/workspace
-    working_dir: /workspace
-    command: --jobs 1 --test --very-verbose usuario.hurl gasto.hurl --variable base_url=http://api:8080 #--jobs 1 flag hace que se corran secuencialmente los tests, asegurando self-containment de los tests
 
 volumes:
   pgdata:

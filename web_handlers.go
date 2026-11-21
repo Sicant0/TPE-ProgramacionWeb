@@ -25,18 +25,18 @@ func registrarRutasWeb() {
 	http.HandleFunc("GET /{$}", indexPage)
 
 	http.HandleFunc("GET /usuarios", listarUsuariosPage)
-	http.HandleFunc("GET /usuarios/nuevo", nuevoUsuarioPage)
 	http.HandleFunc("POST /usuarios", crearUsuarioForm)
-	http.HandleFunc("GET /usuarios/{id}/editar", editarUsuarioPage)
+	http.HandleFunc("GET /usuarios/{id}", mostrarUsuarioItem)
+	http.HandleFunc("GET /usuarios/{id}/editar", editarUsuarioItem)
 	http.HandleFunc("POST /usuarios/{id}/editar", actualizarUsuarioForm)
-	http.HandleFunc("POST /usuarios/{id}/eliminar", eliminarUsuarioForm)
+	http.HandleFunc("DELETE /usuarios/{id}", eliminarUsuario)
 
 	http.HandleFunc("GET /gastos", listarGastosPage)
-	http.HandleFunc("GET /gastos/nuevo", nuevoGastoPage)
 	http.HandleFunc("POST /gastos", crearGastoForm)
-	http.HandleFunc("GET /gastos/{id}/editar", editarGastoPage)
+	http.HandleFunc("GET /gastos/{id}", mostrarGastoItem)
+	http.HandleFunc("GET /gastos/{id}/editar", editarGastoItem)
 	http.HandleFunc("POST /gastos/{id}/editar", actualizarGastoForm)
-	http.HandleFunc("POST /gastos/{id}/eliminar", eliminarGastoForm)
+	http.HandleFunc("DELETE /gastos/{id}", eliminarGasto)
 }
 
 // VALIDACION
@@ -168,12 +168,7 @@ func listarUsuariosPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error al leer usuarios", http.StatusInternalServerError)
 		return
 	}
-	render(w, r, http.StatusOK, views.UsersPage(usuarios))
-}
-
-// Renderiza la pagina de creacion de usuario
-func nuevoUsuarioPage(w http.ResponseWriter, r *http.Request) {
-	render(w, r, http.StatusOK, views.UserFormPage(views.UsuarioFormData{}))
+	render(w, r, http.StatusOK, views.UsersPage(usuarios, views.UsuarioFormData{}))
 }
 
 // leerYValidadFormUsuario lee el formulario y arma el request para crear/actualizar un usuario
@@ -189,76 +184,113 @@ func leerYValidarFormUsuario(r *http.Request) (UsuarioRequest, views.UsuarioForm
 	return req, form, req.Validar()
 }
 
-// Recibe el form de creacion de un usuario, valida y si es exitoso, crea el usuario y retorna a la pagina de usuarios
+// Recibe el form de creacion de un usuario, valida y si es exitoso, crea el usuario y renderiza sobre la misma pagina con el nuevo usuario listado
 func crearUsuarioForm(w http.ResponseWriter, r *http.Request) {
 	req, form, err := leerYValidarFormUsuario(r)
 	if err != nil {
 		form.Error = err.Error()
-		render(w, r, http.StatusBadRequest, views.UserFormPage(form))
+		render(w, r, http.StatusBadRequest, views.UserCreateDivForm(form))
 		return
 	}
 
 	params := db.CreateUsuarioParams{Username: req.Username, Email: req.Email}
 	if _, err := queries.CreateUsuario(r.Context(), params); err != nil {
 		form.Error = "error al crear usuario"
-		render(w, r, http.StatusInternalServerError, views.UserFormPage(form))
+		render(w, r, http.StatusInternalServerError, views.UserCreateDivForm(form))
 		return
 	}
 
-	http.Redirect(w, r, "/usuarios", http.StatusSeeOther)
+	//En vez de redireccionar a /usuarios, se reconsultan los usuarios para realizar la recarga parcial
+	usuarios, err := queries.GetAllUsuarios(r.Context())
+	if err != nil {
+		http.Error(w, "error al leer usuarios", http.StatusInternalServerError)
+		return
+	}
+
+	render(
+    	w,
+    	r,
+    	http.StatusOK,
+    	templ.Join(
+        	views.UserList(usuarios),
+        	views.UserCreateDivFormOOB(views.UsuarioFormData{}),
+    	),
+	)
 }
 
-// Renderiza la pagina de edicion de un usuario
-func editarUsuarioPage(w http.ResponseWriter, r *http.Request) {
+// Funcion auxiliar que busca el usuario de una ruta (el {id} de la URL), utilizado para la edicion/cancelacion de edicion de un usuario
+func usuarioDeRuta(w http.ResponseWriter, r *http.Request) (db.Usuario, bool){
 	id, err := idDeRuta(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+		return db.Usuario{}, false
 	}
 	u, err := queries.GetUsuario(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			http.NotFound(w, r)
-			return
+		} else {
+			http.Error(w, "error al leer usuario", http.StatusInternalServerError)
 		}
-		http.Error(w, "error al leer usuario", http.StatusInternalServerError)
+		return db.Usuario{}, false
+	}
+	return u, true
+}
+
+// Devuelve la fila de un usuario (utilizada al cancelar una edicion de un usuario)
+func mostrarUsuarioItem(w http.ResponseWriter, r *http.Request){
+	u, ok := usuarioDeRuta(w, r)
+	if !ok {
+		return
+	}
+	render(w, r, http.StatusOK, views.UserItem(u))
+}
+
+// Devuelve la fila de un usuario en modo edicion (con formulario precargado con info del usuario)
+func editarUsuarioItem(w http.ResponseWriter, r *http.Request) {
+	u, ok := usuarioDeRuta(w, r)
+	if !ok {
 		return
 	}
 	form := views.UsuarioFormData{ID: u.IDUser, Username: u.Username, Email: u.Email}
-	render(w, r, http.StatusOK, views.UserFormPage(form))
+	render(w, r, http.StatusOK, views.UserEditItem(form))
 }
 
-// Recibe el form de actualizacion de un usuario, valida y si es exitoso, actualiza el usuario y retorna a la pagina de usuarios
+// Procesa la actualizacion de un usuario: si es valida, retorna la fila editada en modo lectura; si no es valida, devuelve la fila en modo edicion con el error indicado
 func actualizarUsuarioForm(w http.ResponseWriter, r *http.Request) {
 	id, err := idDeRuta(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	//valida cambios sobre usuario
 	req, form, err := leerYValidarFormUsuario(r)
 	form.ID = id
 	if err != nil {
 		form.Error = err.Error()
-		render(w, r, http.StatusBadRequest, views.UserFormPage(form))
+		render(w, r, http.StatusBadRequest, views.UserEditItem(form))
 		return
 	}
-
+	//actualiza usuario
 	params := db.UpdateUsuarioParams{IDUser: id, Username: req.Username, Email: req.Email}
-	if _, err := queries.UpdateUsuario(r.Context(), params); err != nil {
+	u, err := queries.UpdateUsuario(r.Context(), params)
+	//si hay errores, renderiza el form de edicion con el error apropiado
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			http.NotFound(w, r)
+			form.Error = "el usuario ya no existe"
+			render(w, r, http.StatusNotFound, views.UserEditItem(form))
 			return
 		}
 		form.Error = "error al actualizar usuario"
-		render(w, r, http.StatusInternalServerError, views.UserFormPage(form))
+		render(w, r, http.StatusInternalServerError, views.UserEditItem(form))
 		return
 	}
-
-	http.Redirect(w, r, "/usuarios", http.StatusSeeOther)
+	//sin errores, renderiza la fila del usuario ya editado
+	render(w, r, http.StatusOK, views.UserItem(u))
 }
 
-// Procesa la eliminacion de un usuario, si es exitosa, elimina al usuario y retorna a la pagina de usuarios
-func eliminarUsuarioForm(w http.ResponseWriter, r *http.Request) {
+// Procesa la eliminacion de un usuario, si es exitosa, elimina al usuario y su fila en el render, eliminadolo de la lista (via hx-delete)
+func eliminarUsuario(w http.ResponseWriter, r *http.Request) {
 	id, err := idDeRuta(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -269,7 +301,7 @@ func eliminarUsuarioForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/usuarios", http.StatusSeeOther)
+	w.WriteHeader(http.StatusOK) //ahora solo se envia el mensaje de OK, no hay redireccion debido a HTMX
 }
 
 // rendering de paginas de gastos
@@ -281,31 +313,73 @@ func listarGastosPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error al leer gastos", http.StatusInternalServerError)
 		return
 	}
-
-	render(w, r, http.StatusOK, views.GastosPage(gastos, ""))
-}
-
-// Renderiza la pagina de creacion o edicion de un gasto
-func renderGastoForm(w http.ResponseWriter, r *http.Request, status int, form views.GastoFormData) {
-	var usuarios []db.Usuario
-	if form.ID == 0 {
-		var err error
-		usuarios, err = queries.GetAllUsuarios(r.Context())
-		if err != nil {
-			http.Error(w, "error al leer usuarios", http.StatusInternalServerError)
-			return
-		}
+	//rebusca los usuarios nuevamente para mandarselos al createForm que ahora vive en la misma pagina
+	usuarios, err := queries.GetAllUsuarios(r.Context())
+	if err != nil {
+		http.Error(w, "error al leer usuarios", http.StatusInternalServerError)
+		return
 	}
-	render(w, r, status, views.GastoFormPage(form, usuarios))
-}
-
-// Renderiza la pagina de creacion de un gasto
-func nuevoGastoPage(w http.ResponseWriter, r *http.Request) {
 	form := views.GastoFormData{Fecha: time.Now().Format(formatoFecha)}
-	renderGastoForm(w, r, http.StatusOK, form)
+	render(w, r, http.StatusOK, views.GastosPage(gastos, form, usuarios))
 }
 
-// leerYValidadFormGasto lee el formulario y arma el request para crear/actualizar un gasto
+// Funcion auxiliar para poder reemplazar el div del form con el error via hx-target-error
+func renderErrorFormGasto(w http.ResponseWriter, r *http.Request, status int, form views.GastoFormData) {
+	usuarios, err := queries.GetAllUsuarios(r.Context())
+	if err != nil {
+		http.Error(w, "error al leer usuarios", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, status, views.GastoCreateDivForm(form, usuarios))
+}
+
+// Funcion auxiliar que obtiene el gasto de la URL
+func gastoDeRuta(w http.ResponseWriter, r *http.Request) (db.Gasto, bool) {
+	id, err := idDeRuta(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return db.Gasto{}, false
+	}
+	g, err := queries.GetGasto(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.NotFound(w, r)
+		} else {
+			http.Error(w, "error al leer gasto", http.StatusInternalServerError)
+		}
+		return db.Gasto{}, false
+	}
+	return g, true
+}
+
+// Devuelve la fila de gasto, utilizado si se cancela la edicion de un gasto
+func mostrarGastoItem(w http.ResponseWriter, r *http.Request) {
+	g, ok := gastoDeRuta(w, r)
+	if !ok {
+		return
+	}
+	render(w, r, http.StatusOK, views.GastoItem(g))
+}
+
+// Devuelve un gasto en modo edicion, con los datos precargados del gasto en el formulario
+func editarGastoItem(w http.ResponseWriter, r *http.Request) {
+	g, ok := gastoDeRuta(w, r)
+	if !ok {
+		return
+	}
+	form := views.GastoFormData{
+		ID:          g.IDGasto,
+		IDUser:      g.IDUser,
+		Titulo:      g.Titulo,
+		Descripcion: g.Descripcion,
+		Monto:       g.Monto,
+		Categoria:   string(g.Categoria),
+		Fecha:       g.Fecha.Format(formatoFecha),
+	}
+	render(w, r, http.StatusOK, views.GastoEditItem(form))
+}
+
+// leerYValidarFormGasto lee el formulario y arma el request para crear/actualizar un gasto
 func leerYValidarFormGasto(r *http.Request) (GastoRequest, views.GastoFormData, error) {
 	if err := r.ParseForm(); err != nil {
 		return GastoRequest{}, views.GastoFormData{}, errors.New("formulario inválido")
@@ -340,21 +414,22 @@ func leerYValidarFormGasto(r *http.Request) (GastoRequest, views.GastoFormData, 
 	return req, form, req.Validar()
 }
 
-// Recibe el form de creacion de un gasto, valida y si es exitoso, crea el gasto y retorna a la pagina de gastos
+// Recibe el form de creacion de un gasto, valida y si es exitoso, crea el gasto y renderiza sobre la misma pagina con el nuevo gasto listado
 func crearGastoForm(w http.ResponseWriter, r *http.Request) {
 	req, form, err := leerYValidarFormGasto(r)
 	if err != nil {
 		form.Error = err.Error()
-		renderGastoForm(w, r, http.StatusBadRequest, form)
+		renderErrorFormGasto(w, r, http.StatusBadRequest, form)
 		return
 	}
 	if _, err := queries.GetUsuario(r.Context(), req.IDUser); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			form.Error = "el usuario indicado no existe"
-			renderGastoForm(w, r, http.StatusBadRequest, form)
+			renderErrorFormGasto(w, r, http.StatusBadRequest, form)
 			return
 		}
-		http.Error(w, "error al leer el usuario", http.StatusInternalServerError)
+		form.Error = "error al leer el usuario"
+		renderErrorFormGasto(w, r, http.StatusInternalServerError, form)
 		return
 	}
 
@@ -368,56 +443,43 @@ func crearGastoForm(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err := queries.CreateGasto(r.Context(), params); err != nil {
 		form.Error = "error al crear gasto"
-		renderGastoForm(w, r, http.StatusInternalServerError, form)
+		renderErrorFormGasto(w, r, http.StatusInternalServerError, form)
 		return
 	}
 
-	http.Redirect(w, r, "/gastos", http.StatusSeeOther)
+	//nueva parte con recarga parcial
+	gastos, err := queries.GetAllGastos(r.Context())
+	if err != nil {
+		http.Error(w, "error al leer gastos", http.StatusInternalServerError)
+		return
+	}
+	usuarios, err := queries.GetAllUsuarios(r.Context())
+	if err != nil {
+		http.Error(w, "error al leer usuarios", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, http.StatusOK, templ.Join(
+		views.GastoList(gastos),
+		views.GastoCreateDivFormOOB(views.GastoFormData{Fecha: time.Now().Format(formatoFecha)}, usuarios),
+	))
 }
 
-// Renderiza la pagina de edicion de un gasto
-func editarGastoPage(w http.ResponseWriter, r *http.Request) {
-	id, err := idDeRuta(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	g, err := queries.GetGasto(r.Context(), id)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			http.NotFound(w, r)
-			return
-		}
-		http.Error(w, "error al leer gasto", http.StatusInternalServerError)
-		return
-	}
-	form := views.GastoFormData{
-		ID:          g.IDGasto,
-		IDUser:      g.IDUser,
-		Titulo:      g.Titulo,
-		Descripcion: g.Descripcion,
-		Monto:       g.Monto,
-		Categoria:   string(g.Categoria),
-		Fecha:       g.Fecha.Format(formatoFecha),
-	}
-	renderGastoForm(w, r, http.StatusOK, form)
-}
-
-// Recibe el form de actualizacion de un gasto, valida y si es exitoso, actualiza el gasto y retorna a la pagina de gastos
+// Procesa la actualizacion de un gasto: si es valida, retorna la fila editada en modo lectura; si no es valida, devuelve la fila en modo edicion con el error indicado
 func actualizarGastoForm(w http.ResponseWriter, r *http.Request) {
 	id, err := idDeRuta(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	//valida cambios sobre gasto
 	req, form, err := leerYValidarFormGasto(r)
 	form.ID = id
 	if err != nil {
 		form.Error = err.Error()
-		renderGastoForm(w, r, http.StatusBadRequest, form)
+		render(w, r, http.StatusBadRequest, views.GastoEditItem(form))
 		return
 	}
-
+	//actualiza gasto
 	params := db.UpdateGastoParams{
 		IDGasto:     id,
 		IDUser:      req.IDUser,
@@ -427,21 +489,24 @@ func actualizarGastoForm(w http.ResponseWriter, r *http.Request) {
 		Categoria:   db.PosiblesCategorias(req.Categoria),
 		Fecha:       req.Fecha,
 	}
-	if _, err := queries.UpdateGasto(r.Context(), params); err != nil {
+	g, err := queries.UpdateGasto(r.Context(), params)
+	//si hay errores al actualizar, renderiza el form con el error de actualizacion
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			http.NotFound(w, r)
+			form.Error = "el gasto ya no existe"
+			render(w, r, http.StatusNotFound, views.GastoEditItem(form))
 			return
 		}
 		form.Error = "error al actualizar gasto"
-		renderGastoForm(w, r, http.StatusInternalServerError, form)
+		render(w, r, http.StatusInternalServerError, views.GastoEditItem(form))
 		return
 	}
-
-	http.Redirect(w, r, "/gastos", http.StatusSeeOther)
+	//sin errores, renderiza la fila del gasto ya editado
+	render(w, r, http.StatusOK, views.GastoItem(g))
 }
 
-// Procesa la eliminacion de un gasto, si es exitosa, elimina el gasto y retorna a la pagina de gastos
-func eliminarGastoForm(w http.ResponseWriter, r *http.Request) {
+// Procesa la eliminacion de un gasto, si es exitosa, elimina al gasto y su fila en el render, eliminadolo de la lista (via hx-delete)
+func eliminarGasto(w http.ResponseWriter, r *http.Request) {
 	id, err := idDeRuta(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -452,5 +517,5 @@ func eliminarGastoForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/gastos", http.StatusSeeOther)
+	w.WriteHeader(http.StatusOK) //ahora solo se envia el mensaje de OK, no hay redireccion debido a HTMX
 }

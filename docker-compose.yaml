@@ -39,6 +39,18 @@ services:
       - DB_NAME=${DB_NAME}
       - PORT_IN=${PORT_IN}
       - PORT_OUT=${PORT_OUT}
+  hurl:
+    image: ghcr.io/orange-opensource/hurl:6.1.1
+    depends_on:
+      - api
+    networks:
+      - red-app
+    volumes:
+      - ./hurl:/workspace
+    working_dir: /workspace
+    # --jobs 1: los archivos corren en orden (usuarios y despues gastos) porque comparten la base
+    command: --test --jobs 1 --variable base_url=http://api:8080 usuarios.hurl gastos.hurl
+    profiles: ["test"]
 
 volumes:
   pgdata:

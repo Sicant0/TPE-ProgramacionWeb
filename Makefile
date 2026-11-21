@@ -18,10 +18,10 @@ server-up: make-env generate
 		exit 1; \
 	}
 
-server-down:
+server-down: make-env
 	docker compose down
 
-server-reset:
+server-reset: make-env
 	docker compose down -v
 
 run-app:

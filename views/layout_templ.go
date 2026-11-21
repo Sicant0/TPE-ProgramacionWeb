@@ -41,7 +41,7 @@ func Layout(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - Administrador de Gastos</title><link rel=\"stylesheet\" href=\"/static/styles.css\"></head><body><header class=\"site-header\"><a class=\"brand\" href=\"/\">Administrador de Gastos</a><nav class=\"nav\"><a href=\"/usuarios/nuevo\">Crear Usuario</a> <a href=\"/gastos/nuevo\">Crear Gasto</a> <a href=\"/usuarios\">Listar Usuarios</a> <a href=\"/gastos\">Listar Gastos</a></nav></header><main class=\"site-content\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - Administrador de Gastos</title><link rel=\"stylesheet\" href=\"/static/styles.css\"><script src=\"https://unpkg.com/htmx.org@1.9.10\"></script><script src=\"https://unpkg.com/htmx.org@1.9.10/dist/ext/response-targets.js\"></script></head><body hx-ext=\"response-targets\"><header class=\"site-header\"><a class=\"brand\" href=\"/\">Administrador de Gastos</a><nav class=\"nav\"><a href=\"/usuarios\">Usuarios</a> <a href=\"/gastos\">Gastos</a></nav></header><main class=\"site-content\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

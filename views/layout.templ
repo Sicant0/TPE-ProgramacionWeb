@@ -9,15 +9,16 @@ templ Layout(title string) {
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 			<title>{ title } - Administrador de Gastos</title>
 			<link rel="stylesheet" href="/static/styles.css"/>
+			<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+			// extension oficial para poder redirigir segun codigo de respuesta (hx-target-error)
+			<script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/response-targets.js"></script>
 		</head>
-		<body>
+		<body hx-ext="response-targets">
 			<header class="site-header">
 				<a class="brand" href="/">Administrador de Gastos</a>
 				<nav class="nav">
-					<a href="/usuarios/nuevo">Crear Usuario</a>
-					<a href="/gastos/nuevo">Crear Gasto</a>
-					<a href="/usuarios">Listar Usuarios</a>
-					<a href="/gastos">Listar Gastos</a>
+					<a href="/usuarios">Usuarios</a>
+					<a href="/gastos">Gastos</a>
 				</nav>
 			</header>
 			<main class="site-content">
